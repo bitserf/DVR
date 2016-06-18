@@ -54,7 +54,7 @@ class SessionTests: XCTestCase {
             expectation.fulfill()
         }.resume()
 
-        waitForExpectations(withTimeout: 1, handler: nil)
+        waitForExpectations(withTimeout: 15, handler: nil)
     }
 
     func testTextPlayback() {
@@ -77,7 +77,7 @@ class SessionTests: XCTestCase {
             expectation.fulfill()
         }.resume()
 
-        waitForExpectations(withTimeout: 1, handler: nil)
+        waitForExpectations(withTimeout: 15, handler: nil)
     }
 
     func testDownload() {
@@ -103,7 +103,7 @@ class SessionTests: XCTestCase {
             expectation.fulfill()
         }.resume()
 
-        waitForExpectations(withTimeout: 1, handler: nil)
+        waitForExpectations(withTimeout: 15, handler: nil)
     }
 
     func testMultiple() {
@@ -131,6 +131,6 @@ class SessionTests: XCTestCase {
             apple.fulfill()
         }.resume()
 
-        waitForExpectations(withTimeout: 1, handler: nil)
+        waitForExpectations(withTimeout: 15, handler: nil)
     }
 }
