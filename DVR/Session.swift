@@ -1,26 +1,26 @@
 import Foundation
 
-public class Session: NSURLSession {
+public class Session: URLSession {
 
     // MARK: - Properties
 
     public var outputDirectory: String
     public let cassetteName: String
-    public let backingSession: NSURLSession
+    public let backingSession: URLSession
     public var recordingEnabled = true
 
-    private let testBundle: NSBundle
+    private let testBundle: Bundle
 
     private var recording = false
     private var needsPersistence = false
-    private var outstandingTasks = [NSURLSessionTask]()
+    private var outstandingTasks = [URLSessionTask]()
     private var completedInteractions = [Interaction]()
-    private var completionBlock: (Void -> Void)?
+    private var completionBlock: ((Void) -> Void)?
 
 
     // MARK: - Initializers
 
-    public init(outputDirectory: String = "~/Desktop/DVR/", cassetteName: String, testBundle: NSBundle = NSBundle.allBundles().filter() { $0.bundlePath.hasSuffix(".xctest") }.first!, backingSession: NSURLSession = NSURLSession.sharedSession()) {
+    public init(outputDirectory: String = "~/Desktop/DVR/", cassetteName: String, testBundle: Bundle = Bundle.allBundles().filter() { $0.bundlePath.hasSuffix(".xctest") }.first!, backingSession: URLSession = URLSession.shared()) {
         self.outputDirectory = outputDirectory
         self.cassetteName = cassetteName
         self.testBundle = testBundle
@@ -29,22 +29,22 @@ public class Session: NSURLSession {
     }
 
 
-    // MARK: - NSURLSession
-
-    public override func dataTaskWithRequest(request: NSURLRequest) -> NSURLSessionDataTask {
-        return addDataTask(request)
+    // MARK: - URLSession
+    
+    public override func dataTask(with request: URLRequest) -> URLSessionDataTask {
+        return addDataTask(request: request)
     }
-
-    public override func dataTaskWithRequest(request: NSURLRequest, completionHandler: (NSData?, NSURLResponse?, NSError?) -> Void) -> NSURLSessionDataTask {
-        return addDataTask(request, completionHandler: completionHandler)
+    
+    public override func dataTask(with request: URLRequest, completionHandler: (Data?, URLResponse?, NSError?) -> Void) -> URLSessionDataTask {
+        return addDataTask(request: request, completionHandler: completionHandler)
     }
-
-    public override func downloadTaskWithRequest(request: NSURLRequest) -> NSURLSessionDownloadTask {
-        return addDownloadTask(request)
+    
+    public override func downloadTask(with request: URLRequest) -> URLSessionDownloadTask {
+        return addDownloadTask(request: request)
     }
-
-    public override func downloadTaskWithRequest(request: NSURLRequest, completionHandler: (NSURL?, NSURLResponse?, NSError?) -> Void) -> NSURLSessionDownloadTask {
-        return addDownloadTask(request, completionHandler: completionHandler)
+    
+    public override func downloadTask(with request: URLRequest, completionHandler: (URL?, URLResponse?, NSError?) -> Void) -> URLSessionDownloadTask {
+        return addDownloadTask(request: request, completionHandler: completionHandler)
     }
 
     public override func invalidateAndCancel() {
@@ -72,7 +72,7 @@ public class Session: NSURLSession {
     /// This only needs to be called if you call `beginRecording`. `completion` will be called on the main queue after
     /// the completion block of the last task is called. `completion` is useful for fulfilling an expectation you setup
     /// before calling `beginRecording`.
-    public func endRecording(completion: (Void -> Void)? = nil) {
+    public func endRecording(completion: ((Void) -> Void)? = nil) {
         if !recording {
             return
         }
@@ -90,19 +90,19 @@ public class Session: NSURLSession {
 
     var cassette: Cassette? {
         guard let path = testBundle.pathForResource(cassetteName, ofType: "json"),
-            data = NSData(contentsOfFile: path),
-            raw = try? NSJSONSerialization.JSONObjectWithData(data, options: []),
+            data = try? Data(contentsOf: URL(fileURLWithPath: path)),
+            raw = try? JSONSerialization.jsonObject(with: data, options: []),
             json = raw as? [String: AnyObject]
         else { return nil }
 
         return Cassette(dictionary: json)
     }
 
-    func finishTask(task: NSURLSessionTask, interaction: Interaction, playback: Bool) {
+    func finishTask(task: URLSessionTask, interaction: Interaction, playback: Bool) {
         needsPersistence = needsPersistence || !playback
 
-        if let index = outstandingTasks.indexOf(task) {
-            outstandingTasks.removeAtIndex(index)
+        if let index = outstandingTasks.index(of: task) {
+            outstandingTasks.remove(at: index)
         }
 
         completedInteractions.append(interaction)
@@ -115,21 +115,21 @@ public class Session: NSURLSession {
 
     // MARK: - Private
 
-    private func addDataTask(request: NSURLRequest, completionHandler: ((NSData?, NSURLResponse?, NSError?) -> Void)? = nil) -> NSURLSessionDataTask {
-        let modifiedRequest = backingSession.configuration.HTTPAdditionalHeaders.map(request.requestByAppendingHeaders) ?? request
+    private func addDataTask(request: URLRequest, completionHandler: ((Data?, URLResponse?, NSError?) -> Void)? = nil) -> URLSessionDataTask {
+        let modifiedRequest = backingSession.configuration.httpAdditionalHeaders.map(request.appendingHeaders) ?? request
         let task = SessionDataTask(session: self, request: modifiedRequest, completion: completionHandler)
-        addTask(task)
+        addTask(task: task)
         return task
     }
 
-    private func addDownloadTask(request: NSURLRequest, completionHandler: SessionDownloadTask.Completion? = nil) -> NSURLSessionDownloadTask {
-        let modifiedRequest = backingSession.configuration.HTTPAdditionalHeaders.map(request.requestByAppendingHeaders) ?? request
+    private func addDownloadTask(request: URLRequest, completionHandler: SessionDownloadTask.Completion? = nil) -> URLSessionDownloadTask {
+        let modifiedRequest = backingSession.configuration.httpAdditionalHeaders.map(request.appendingHeaders) ?? request
         let task = SessionDownloadTask(session: self, request: modifiedRequest, completion: completionHandler)
-        addTask(task)
+        addTask(task: task)
         return task
     }
 
-    private func addTask(task: NSURLSessionTask) {
+    private func addTask(task: URLSessionTask) {
         let shouldRecord = !recording
         if shouldRecord {
             beginRecording()
@@ -148,11 +148,11 @@ public class Session: NSURLSession {
         }
 
         // Create directory
-        let outputDirectory = (self.outputDirectory as NSString).stringByExpandingTildeInPath
-        let fileManager = NSFileManager.defaultManager()
-        if !fileManager.fileExistsAtPath(outputDirectory) {
+        let outputDirectory = (self.outputDirectory as NSString).expandingTildeInPath
+        let fileManager = FileManager.default()
+        if !fileManager.fileExists(atPath: outputDirectory) {
 			do {
-				try fileManager.createDirectoryAtPath(outputDirectory, withIntermediateDirectories: true, attributes: nil)
+                try fileManager.createDirectory(atPath: outputDirectory, withIntermediateDirectories: true, attributes: nil)
 			} catch {
 				print("[DVR] Failed to create cassettes directory.")
 			}
@@ -164,18 +164,18 @@ public class Session: NSURLSession {
 
 
         do {
-            let outputPath = ((outputDirectory as NSString).stringByAppendingPathComponent(cassetteName) as NSString).stringByAppendingPathExtension("json")!
-            let data = try NSJSONSerialization.dataWithJSONObject(cassette.dictionary, options: [.PrettyPrinted])
+            let outputPath = ((outputDirectory as NSString).appendingPathComponent(cassetteName) as NSString).appendingPathExtension("json")!
+            let data = try JSONSerialization.data(withJSONObject: cassette.dictionary, options: [.prettyPrinted])
 
             // Add trailing new line
-            guard var string = NSString(data: data, encoding: NSUTF8StringEncoding) else {
+            guard var string = String(data: data, encoding: String.Encoding.utf8) else {
                 print("[DVR] Failed to persist cassette.")
                 return
             }
-            string = string.stringByAppendingString("\n")
+            string.append("\n")
 
-            if let data = string.dataUsingEncoding(NSUTF8StringEncoding) {
-                data.writeToFile(outputPath, atomically: true)
+            if let data = string.data(using: String.Encoding.utf8) {
+                (data as NSData).write(toFile: outputPath, atomically: true)
                 print("[DVR] Persisted cassette at \(outputPath). Please add this file to your test target")
             }
 
@@ -187,7 +187,7 @@ public class Session: NSURLSession {
 
     private func finishRecording() {
         if needsPersistence {
-            persist(completedInteractions)
+            persist(interactions: completedInteractions)
         }
 
         // Clean up
